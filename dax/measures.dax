@@ -1,0 +1,55 @@
+// DAX measures — Swedish Staffing Profitability
+// Home table: FactFinancials (values stored in kSEK). FactVacancies is a separate, unrelated table.
+
+// ---- Base measures --------------------------------------------------------
+Revenue (MSEK) =
+    DIVIDE ( SUM ( FactFinancials[Revenue] ), 1000 )                      // format: #,0
+
+Operating Result (MSEK) =
+    DIVIDE ( SUM ( FactFinancials[OperatingResult] ), 1000 )              // format: #,0
+
+Net Result (MSEK) =
+    DIVIDE ( SUM ( FactFinancials[NetResult] ), 1000 )                    // format: #,0
+
+Operating Margin =
+    DIVIDE ( SUM ( FactFinancials[OperatingResult] ), SUM ( FactFinancials[Revenue] ) )   // format: 0.0%
+
+// ---- "Selected year" measures ---------------------------------------------
+// With no Year selected these return the latest year (2025); with a Year selected
+// in the slicer they return that year. Used by the KPI cards and the scorecard.
+
+Revenue Selected Year (MSEK) =
+    VAR y = MAX ( FactFinancials[Year] )
+    RETURN CALCULATE ( [Revenue (MSEK)], FactFinancials[Year] = y )
+
+Revenue Selected Year (bn SEK) =
+    DIVIDE ( [Revenue Selected Year (MSEK)], 1000 )                       // format: 0.0
+
+Margin Selected Year =
+    VAR y = MAX ( FactFinancials[Year] )
+    RETURN CALCULATE ( [Operating Margin], FactFinancials[Year] = y )
+
+Loss-Making Companies =
+    VAR y = MAX ( FactFinancials[Year] )
+    RETURN
+        COUNTROWS (
+            FILTER (
+                VALUES ( FactFinancials[Company] ),
+                CALCULATE ( SUM ( FactFinancials[OperatingResult] ), FactFinancials[Year] = y ) < 0
+            )
+        ) + 0
+
+Revenue Change vs 2022 =
+    VAR y    = MAX ( FactFinancials[Year] )
+    VAR cur  = CALCULATE ( [Revenue (MSEK)], FactFinancials[Year] = y )
+    VAR base = CALCULATE ( [Revenue (MSEK)], FactFinancials[Year] = 2022 )   // 2022 = revenue peak
+    RETURN DIVIDE ( cur - base, base )                                       // format: 0.0%
+
+// ---- Vacancies --------------------------------------------------------------
+Latest Vacancies =
+    VAR d = MAX ( FactVacancies[QuarterStart] )
+    RETURN CALCULATE ( SUM ( FactVacancies[Vacancies] ), FactVacancies[QuarterStart] = d )
+
+// ---- Top 10 -------------------------------------------------------------------
+// The "Top 10 most profitable" bar chart and the year-by-year matrix use a visual-level
+// Top N filter on FactFinancials[Company]: Top 10 by [Operating Result (MSEK)].
